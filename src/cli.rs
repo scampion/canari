@@ -19,6 +19,30 @@ pub enum Command {
     /// Manage notification channels
     #[command(subcommand)]
     Channel(ChannelCmd),
+
+    /// Operator account and instance settings
+    #[command(subcommand)]
+    Admin(AdminCmd),
+}
+
+#[derive(Subcommand, Debug)]
+pub enum AdminCmd {
+    /// Set the web interface password (prompts when not given inline)
+    SetPassword {
+        /// Password; omit to be prompted without echo
+        #[arg(long)]
+        password: Option<String>,
+    },
+}
+
+pub async fn run_admin(state: &AppState, cmd: &AdminCmd) -> anyhow::Result<()> {
+    match cmd {
+        AdminCmd::SetPassword { password } => {
+            crate::auth::set_password_interactive(&state.db, password.as_deref()).await?;
+            println!("password updated — existing sessions were signed out");
+        }
+    }
+    Ok(())
 }
 
 #[derive(Subcommand, Debug)]

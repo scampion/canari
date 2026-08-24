@@ -1,3 +1,4 @@
+mod auth;
 mod cli;
 mod config;
 mod db;
@@ -28,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
 
     // One-shot commands print their own output; the server logs.
     let default_filter = match config.command {
-        Some(Command::Check(_)) | Some(Command::Channel(_)) => "warn",
+        Some(Command::Check(_)) | Some(Command::Channel(_)) | Some(Command::Admin(_)) => "warn",
         _ => "canari=info,tower_http=warn",
     };
     tracing_subscriber::fmt()
@@ -54,6 +55,7 @@ async fn main() -> anyhow::Result<()> {
     let result = match &state.config.command {
         Some(Command::Check(cmd)) => cli::run_check(&state, cmd).await,
         Some(Command::Channel(cmd)) => cli::run_channel(&state, cmd).await,
+        Some(Command::Admin(cmd)) => cli::run_admin(&state, cmd).await,
         _ => {
             tracing::info!(db = %state.config.db.display(), "database ready");
             serve(state.clone()).await

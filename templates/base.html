@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}canari{% endblock %}</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png">
+  <link rel="stylesheet" href="/static/style.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/"><img src="/static/logo.png" alt="">canari</a>
+  <nav>
+    <a href="/">Checks</a>
+    <a href="/channels">Channels</a>
+    <form method="post" action="/logout" class="inline"><button class="btn">Log out</button></form>
+  </nav>
+</header>
+<main>
+  {% if let Some(message) = flash_ok %}<div class="flash flash-ok">{{ message }}</div>{% endif %}
+  {% if let Some(message) = flash_err %}<div class="flash flash-err">{{ message }}</div>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

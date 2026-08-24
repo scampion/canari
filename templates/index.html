@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}canari — {{ down_count }} down{% endblock %}
+{% block head %}<meta http-equiv="refresh" content="60">{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>Checks</h1>
+  <span class="muted">{{ summary }}</span>
+  <span class="spacer"></span>
+  <a class="btn btn-primary" href="/checks/new">New check</a>
+</div>
+
+{% if rows.is_empty() %}
+  <div class="panel empty">
+    No checks yet. <a href="/checks/new">Create one</a> and point your cron job at its ping URL.
+  </div>
+{% else %}
+<div class="panel table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Status</th><th>Name</th><th>Schedule</th><th>Last ping</th><th>Late in</th><th>Pings</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+      <tr>
+        <td><span class="status s-{{ row.status }}"><span class="dot"></span>{{ row.status }}</span></td>
+        <td>
+          <a href="/checks/{{ row.uuid }}">{{ row.name }}</a>
+          {% for tag in row.tags %}<span class="tag">{{ tag }}</span>{% endfor %}
+        </td>
+        <td class="muted nowrap">{{ row.schedule }}</td>
+        <td class="nowrap">{{ row.last_ping }}</td>
+        <td class="nowrap">{{ row.late_in }}</td>
+        <td class="muted">{{ row.n_pings }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

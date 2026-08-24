@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>canari — sign in</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="login-wrap">
+  <img src="/static/logo.png" alt="canari">
+  {% if let Some(message) = error %}<div class="flash flash-err">{{ message }}</div>{% endif %}
+  <div class="panel">
+    <form method="post" action="/login">
+      <label>
+        <span>Password</span>
+        <input type="password" name="password" autofocus autocomplete="current-password" required>
+      </label>
+      <button class="btn btn-primary" type="submit">Sign in</button>
+    </form>
+  </div>
+</div>
+</body>
+</html>

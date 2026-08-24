@@ -60,6 +60,73 @@ pub async fn create_check(db: &SqlitePool, new: NewCheck) -> anyhow::Result<Chec
     Ok(check)
 }
 
+/// Apply an edit and, when the schedule moved, recompute the deadline from the
+/// last ping so the change takes effect without waiting for the next one.
+pub async fn update_check(db: &SqlitePool, uuid: &str, new: NewCheck) -> anyhow::Result<Check> {
+    schedule::validate(new.kind, new.cron_expr.as_deref(), &new.tz, new.period_s)?;
+    if new.grace_s <= 0 {
+        anyhow::bail!("grace must be positive");
+    }
+
+    let updated = sqlx::query_as::<_, Check>(
+        "UPDATE checks SET name = ?, description = ?, tags = ?, kind = ?, period_s = ?, \
+                           grace_s = ?, cron_expr = ?, tz = ?, updated_at = ? \
+         WHERE uuid = ? RETURNING *",
+    )
+    .bind(&new.name)
+    .bind(&new.description)
+    .bind(&new.tags)
+    .bind(new.kind)
+    .bind(new.period_s)
+    .bind(new.grace_s)
+    .bind(&new.cron_expr)
+    .bind(&new.tz)
+    .bind(now())
+    .bind(uuid)
+    .fetch_optional(db)
+    .await?
+    .with_context(|| format!("no check with uuid {uuid}"))?;
+
+    if matches!(updated.status, Status::Up | Status::Grace)
+        && let Some(last_ping) = updated.last_ping_at
+    {
+        let alert_after = schedule::next_due(&updated, last_ping)?;
+        sqlx::query("UPDATE checks SET alert_after = ? WHERE id = ?")
+            .bind(alert_after)
+            .bind(updated.id)
+            .execute(db)
+            .await?;
+        return Ok(Check {
+            alert_after: Some(alert_after),
+            ..updated
+        });
+    }
+
+    Ok(updated)
+}
+
+/// Replace a check's channel set in one transaction, for the edit form.
+pub async fn set_check_channels(
+    db: &SqlitePool,
+    check_id: i64,
+    channel_ids: &[i64],
+) -> anyhow::Result<()> {
+    let mut tx = db.begin().await?;
+    sqlx::query("DELETE FROM check_channels WHERE check_id = ?")
+        .bind(check_id)
+        .execute(&mut *tx)
+        .await?;
+    for id in channel_ids {
+        sqlx::query("INSERT INTO check_channels (check_id, channel_id) VALUES (?, ?)")
+            .bind(check_id)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
 pub async fn list_checks(db: &SqlitePool) -> anyhow::Result<Vec<Check>> {
     let checks = sqlx::query_as::<_, Check>("SELECT * FROM checks ORDER BY name, id")
         .fetch_all(db)

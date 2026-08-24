@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}{{ heading }} — canari{% endblock %}
+
+{% block content %}
+<div class="page-head"><h1>{{ heading }}</h1></div>
+
+<form method="post" action="{{ action }}">
+  <div class="grid-2">
+    <div class="panel">
+      <label>
+        <span>Name</span>
+        <input type="text" name="name" value="{{ name }}" required autofocus>
+      </label>
+      <label>
+        <span>Description</span>
+        <textarea name="description">{{ description }}</textarea>
+      </label>
+      <label>
+        <span>Tags (space separated)</span>
+        <input type="text" name="tags" value="{{ tags }}">
+      </label>
+    </div>
+
+    <div class="panel">
+      <label>
+        <span>Schedule type</span>
+        <select name="kind">
+          <option value="simple"{% if kind == "simple" %} selected{% endif %}>Simple period</option>
+          <option value="cron"{% if kind == "cron" %} selected{% endif %}>Cron expression</option>
+        </select>
+      </label>
+      <label>
+        <span>Period — used when the type is “simple” (30s, 5m, 1h30m, 1d)</span>
+        <input type="text" name="period" value="{{ period }}">
+      </label>
+      <label>
+        <span>Cron expression — used when the type is “cron”</span>
+        <input type="text" name="cron" value="{{ cron }}" placeholder="*/5 * * * *">
+      </label>
+      <label>
+        <span>Timezone for the cron expression</span>
+        <input type="text" name="tz" value="{{ tz }}" placeholder="Europe/Paris">
+      </label>
+      <label>
+        <span>Grace period — how late a ping may be before alerting</span>
+        <input type="text" name="grace" value="{{ grace }}">
+      </label>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2 style="margin-top:0">Notification channels</h2>
+    {% if channels.is_empty() %}
+      <p class="muted">No channels yet — <a href="/channels">add one</a>, otherwise alerts go nowhere.</p>
+    {% else %}
+      <div class="check-list">
+      {% for channel in channels %}
+        <label>
+          <input type="checkbox" name="channel_{{ channel.id }}" value="1"{% if channel.selected %} checked{% endif %}>
+          {{ channel.name }} <span class="muted">({{ channel.kind }} → {{ channel.target }})</span>
+        </label>
+      {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="btn-row" style="margin-top:16px">
+    <button class="btn btn-primary" type="submit">Save</button>
+    <a class="btn" href="{{ cancel_url }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

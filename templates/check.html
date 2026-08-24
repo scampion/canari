@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{{ name }} — canari{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>{{ name }}</h1>
+  <span class="status s-{{ status }}"><span class="dot"></span>{{ status }}</span>
+  <span class="spacer"></span>
+  <div class="btn-row">
+    <a class="btn" href="/checks/{{ uuid }}/edit">Edit</a>
+    {% if status == "paused" %}
+      <form class="inline" method="post" action="/checks/{{ uuid }}/resume"><button class="btn">Resume</button></form>
+    {% else %}
+      <form class="inline" method="post" action="/checks/{{ uuid }}/pause"><button class="btn">Pause</button></form>
+    {% endif %}
+    <form class="inline" method="post" action="/checks/{{ uuid }}/delete"
+          onsubmit="return confirm('Delete this check and its ping history?')">
+      <button class="btn btn-danger">Delete</button>
+    </form>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="panel">
+    <h2 style="margin-top:0">Ping URL</h2>
+    <code class="ping-url">{{ ping_url }}</code>
+    <p class="muted" style="margin-bottom:0">
+      Add <code>/start</code>, <code>/fail</code>, <code>/log</code> or an exit code to the URL.
+      Any HTTP method works.
+    </p>
+  </div>
+
+  <div class="panel">
+    <h2 style="margin-top:0">Schedule</h2>
+    <dl class="kv">
+      <dt>Expects</dt><dd>{{ schedule }}</dd>
+      <dt>Last ping</dt><dd>{{ last_ping }}</dd>
+      <dt>Late in</dt><dd>{{ late_in }}</dd>
+      <dt>Total pings</dt><dd>{{ n_pings }}</dd>
+      {% if let Some(duration) = last_duration %}<dt>Last run took</dt><dd>{{ duration }}</dd>{% endif %}
+      <dt>Channels</dt><dd>{{ channels }}</dd>
+      {% if !description.is_empty() %}<dt>Description</dt><dd>{{ description }}</dd>{% endif %}
+      {% if !tags.is_empty() %}
+        <dt>Tags</dt><dd>{% for tag in tags %}<span class="tag">{{ tag }}</span>{% endfor %}</dd>
+      {% endif %}
+    </dl>
+  </div>
+</div>
+
+<h2>Recent pings</h2>
+{% if pings.is_empty() %}
+  <div class="panel empty">No pings received yet.</div>
+{% else %}
+<div class="panel table-wrap">
+  <table>
+    <thead>
+      <tr><th>#</th><th>When</th><th>Kind</th><th>Exit</th><th>Duration</th><th>Via</th><th>From</th><th>Agent</th></tr>
+    </thead>
+    <tbody>
+    {% for ping in pings %}
+      <tr>
+        <td class="muted">{{ ping.n }}</td>
+        <td class="nowrap">{{ ping.when }}</td>
+        <td>{{ ping.kind }}</td>
+        <td>{{ ping.exit_code }}</td>
+        <td class="nowrap">{{ ping.duration }}</td>
+        <td class="muted">{{ ping.method }}</td>
+        <td class="mono">{{ ping.remote_addr }}</td>
+        <td class="muted">{{ ping.user_agent }}</td>
+      </tr>
+      {% if !ping.body.is_empty() %}
+      <tr><td></td><td colspan="7"><pre class="muted" style="margin:0;white-space:pre-wrap">{{ ping.body }}</pre></td></tr>
+      {% endif %}
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}
