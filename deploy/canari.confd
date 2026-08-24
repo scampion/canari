@@ -1,0 +1,17 @@
+# Settings for the canari OpenRC service — install as /etc/conf.d/canari
+
+# Public base URL of the instance: the ping and badge URLs handed out are built
+# from it, so it must be what clients actually reach.
+CANARI_SITE_URL="https://canari.example.org"
+
+# Bind to loopback and put a TLS reverse proxy in front.
+CANARI_LISTEN="127.0.0.1:8000"
+
+CANARI_DB="/var/lib/canari/canari.db"
+
+# Log verbosity, tracing/RUST_LOG syntax.
+#CANARI_LOG="canari=info"
+
+# Account the service runs as.
+#canari_user="canari"
+#canari_group="canari"

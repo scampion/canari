@@ -163,6 +163,42 @@ canari.example.org {
 
 `X-Forwarded-For` est utilisé pour afficher l'IP source des pings.
 
+### OpenRC (Alpine, Gentoo, Artix…)
+
+Le binaire musl statique n'a besoin d'aucune bibliothèque : sur Alpine, il
+suffit d'ajouter `ca-certificates` pour que les notifications sortantes en
+https puissent valider leurs pairs.
+
+```sh
+apk add ca-certificates                       # Alpine ; equivalent ailleurs
+addgroup -S canari && adduser -S -D -H -G canari canari
+
+install -m755 canari /usr/local/bin/canari
+install -m755 deploy/canari.openrc /etc/init.d/canari
+install -m644 deploy/canari.confd  /etc/conf.d/canari
+# ajuster CANARI_SITE_URL dans /etc/conf.d/canari
+
+rc-update add canari default
+rc-service canari start
+
+su canari -s /bin/sh -c \
+  'CANARI_DB=/var/lib/canari/canari.db canari admin set-password'
+```
+
+Le script s'appuie sur `supervise-daemon`, qui relance le processus s'il meurt —
+l'équivalent OpenRC de `Restart=on-failure`. Il crée au démarrage le répertoire
+de la base et le fichier de log, tous deux détenus par le compte de service.
+Les journaux vont dans `/var/log/canari.log` ; `rc-service canari status`,
+`stop` et `restart` fonctionnent normalement, l'arrêt passant par un SIGTERM
+que canari traite proprement (fin des écritures en cours avant fermeture du
+WAL).
+
+Toute la configuration tient dans `/etc/conf.d/canari` : OpenRC le source
+automatiquement, aucune variable n'est à répéter dans le script d'init.
+
+Comme pour systemd, écouter sur la boucle locale et mettre un reverse proxy
+devant pour TLS.
+
 ### Docker
 
 ```sh

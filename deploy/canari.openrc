@@ -1,0 +1,37 @@
+#!/sbin/openrc-run
+# OpenRC service script for canari — install as /etc/init.d/canari
+# Settings live in /etc/conf.d/canari, which OpenRC sources automatically.
+
+name="canari"
+description="canari — dead man's switch monitoring"
+
+command="/usr/local/bin/canari"
+command_user="${canari_user:-canari}:${canari_group:-canari}"
+
+# supervise-daemon restarts the process if it dies, the OpenRC equivalent of
+# systemd's Restart=on-failure.
+supervisor="supervise-daemon"
+respawn_delay=2
+respawn_max=0
+
+pidfile="/run/${RC_SVCNAME}.pid"
+output_log="/var/log/${RC_SVCNAME}.log"
+error_log="/var/log/${RC_SVCNAME}.log"
+
+: "${CANARI_DB:=/var/lib/canari/canari.db}"
+: "${CANARI_LISTEN:=127.0.0.1:8000}"
+: "${CANARI_SITE_URL:=http://localhost:8000}"
+export CANARI_DB CANARI_LISTEN CANARI_SITE_URL CANARI_LOG
+
+depend() {
+    need net
+    after firewall
+}
+
+start_pre() {
+    # canari creates the database itself, but not the directory holding it.
+    checkpath --directory --owner "${canari_user:-canari}:${canari_group:-canari}" \
+        --mode 0750 "$(dirname "$CANARI_DB")"
+    checkpath --file --owner "${canari_user:-canari}:${canari_group:-canari}" \
+        --mode 0640 "$output_log"
+}
