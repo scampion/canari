@@ -8,10 +8,13 @@ use tower_http::trace::TraceLayer;
 use crate::error::AppError;
 use crate::state::AppState;
 
+mod ping;
+
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/", get(index))
         .route("/healthz", get(healthz))
+        .merge(ping::routes())
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .with_state(state)

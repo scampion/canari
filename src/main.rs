@@ -1,15 +1,22 @@
+mod cli;
 mod config;
 mod db;
 mod error;
+mod model;
+mod schedule;
 mod state;
+mod store;
 mod web;
 
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use anyhow::Context;
 use clap::Parser;
+use sqlx::SqlitePool;
 use tracing_subscriber::EnvFilter;
 
+use crate::cli::Command;
 use crate::config::Config;
 use crate::state::AppState;
 
@@ -17,33 +24,51 @@ use crate::state::AppState;
 async fn main() -> anyhow::Result<()> {
     let config = Config::parse();
 
+    // One-shot commands print their own output; the server logs.
+    let default_filter = match config.command {
+        Some(Command::Check(_)) => "warn",
+        _ => "canari=info,tower_http=warn",
+    };
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_env("CANARI_LOG")
-                .unwrap_or_else(|_| EnvFilter::new("canari=info,tower_http=warn")),
+            EnvFilter::try_from_env("CANARI_LOG").unwrap_or_else(|_| EnvFilter::new(default_filter)),
         )
         .init();
 
     let pool = db::connect(&config.db).await?;
-    tracing::info!(db = %config.db.display(), "database ready");
 
+    let result = match &config.command {
+        Some(Command::Check(cmd)) => cli::run(&pool, &config, cmd).await,
+        _ => {
+            tracing::info!(db = %config.db.display(), "database ready");
+            serve(config, pool.clone()).await
+        }
+    };
+
+    // Let in-flight writes land before the WAL is closed.
+    pool.close().await;
+    result
+}
+
+async fn serve(config: Config, pool: SqlitePool) -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(config.listen)
         .await
         .with_context(|| format!("binding {}", config.listen))?;
     tracing::info!(listen = %config.listen, ping_base = %config.ping_base(), "canari listening");
 
     let state = AppState {
-        db: pool.clone(),
+        db: pool,
         config: Arc::new(config),
     };
 
-    axum::serve(listener, web::router(state))
+    // ConnectInfo gives ping handlers the peer address to record.
+    let app = web::router(state).into_make_service_with_connect_info::<SocketAddr>();
+
+    axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
         .context("server error")?;
 
-    // Let in-flight writes land before the WAL is closed.
-    pool.close().await;
     tracing::info!("shutdown complete");
     Ok(())
 }

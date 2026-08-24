@@ -3,6 +3,8 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
+use crate::cli::Command;
+
 #[derive(Parser, Debug)]
 #[command(name = "canari", version, about = "Dead man's switch monitoring for cron jobs")]
 pub struct Config {
@@ -17,6 +19,9 @@ pub struct Config {
     /// Public base URL, used to build the ping URLs handed out to clients
     #[arg(long, env = "CANARI_SITE_URL", default_value = "http://localhost:8000")]
     pub site_url: String,
+
+    #[command(subcommand)]
+    pub command: Option<Command>,
 }
 
 impl Config {
