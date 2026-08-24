@@ -1,0 +1,27 @@
+[package]
+name = "canari"
+version = "0.1.0"
+edition = "2024"
+description = "Dead man's switch monitoring for cron jobs and background services"
+
+[dependencies]
+anyhow = "1.0.104"
+axum = "0.8.9"
+chrono = "0.4.45"
+clap = { version = "4.6.1", features = ["derive", "env"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "sqlite", "macros", "migrate", "chrono"] }
+thiserror = "2.0.20"
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "signal"] }
+tower-http = { version = "0.7.0", features = ["trace", "compression-gzip"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+uuid = { version = "1.25.0", features = ["v4", "serde"] }
+
+# A single static binary is the whole point: strip symbols and let LLVM inline
+# across crate boundaries.
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
