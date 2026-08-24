@@ -2,7 +2,7 @@ use anyhow::Context;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-use crate::model::{Check, CheckKind, PingKind, Status, now};
+use crate::model::{Check, CheckKind, ChannelKind, PingKind, Status, now};
 use crate::schedule;
 
 /// Pings kept per check. Old ones are dropped as new ones arrive, so the
@@ -100,12 +100,164 @@ pub async fn list_pings(db: &SqlitePool, check_id: i64, limit: i64) -> anyhow::R
     Ok(pings)
 }
 
+/// Suspend monitoring: a paused check is never late, so it drops out of the
+/// alert loop's query entirely.
+pub async fn pause_check(db: &SqlitePool, uuid: &str) -> anyhow::Result<bool> {
+    let result = sqlx::query(
+        "UPDATE checks SET status = 'paused', alert_after = NULL, updated_at = ? WHERE uuid = ?",
+    )
+    .bind(now())
+    .bind(uuid)
+    .execute(db)
+    .await?;
+    Ok(result.rows_affected() > 0)
+}
+
+/// Resume monitoring, rescheduling from now rather than from the last ping —
+/// after a maintenance window, the job gets a full period to report in.
+pub async fn resume_check(db: &SqlitePool, uuid: &str) -> anyhow::Result<bool> {
+    let Some(check) = get_check(db, uuid).await? else {
+        return Ok(false);
+    };
+
+    let (status, alert_after) = match check.last_ping_at {
+        Some(_) => (Status::Up, Some(schedule::next_due(&check, now())?)),
+        None => (Status::New, None),
+    };
+
+    sqlx::query("UPDATE checks SET status = ?, alert_after = ?, updated_at = ? WHERE id = ?")
+        .bind(status)
+        .bind(alert_after)
+        .bind(now())
+        .bind(check.id)
+        .execute(db)
+        .await?;
+    Ok(true)
+}
+
 pub async fn delete_check(db: &SqlitePool, uuid: &str) -> anyhow::Result<bool> {
     let result = sqlx::query("DELETE FROM checks WHERE uuid = ?")
         .bind(uuid)
         .execute(db)
         .await?;
     Ok(result.rows_affected() > 0)
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct Channel {
+    pub id: i64,
+    pub kind: ChannelKind,
+    pub name: String,
+    /// Kind-specific JSON, parsed by the notifier.
+    pub config: String,
+    pub enabled: bool,
+    pub created_at: i64,
+}
+
+pub async fn create_channel(
+    db: &SqlitePool,
+    kind: ChannelKind,
+    name: &str,
+    config: &str,
+) -> anyhow::Result<Channel> {
+    // Parsing here means a malformed channel can never reach the alert path,
+    // where the failure would be silent and delayed.
+    crate::notify::validate_config(kind, config)?;
+
+    let channel = sqlx::query_as::<_, Channel>(
+        "INSERT INTO channels (kind, name, config, created_at) VALUES (?, ?, ?, ?) RETURNING *",
+    )
+    .bind(kind)
+    .bind(name)
+    .bind(config)
+    .bind(now())
+    .fetch_one(db)
+    .await?;
+    Ok(channel)
+}
+
+pub async fn list_channels(db: &SqlitePool) -> anyhow::Result<Vec<Channel>> {
+    let channels = sqlx::query_as::<_, Channel>("SELECT * FROM channels ORDER BY id")
+        .fetch_all(db)
+        .await?;
+    Ok(channels)
+}
+
+pub async fn get_channel(db: &SqlitePool, id: i64) -> anyhow::Result<Option<Channel>> {
+    let channel = sqlx::query_as::<_, Channel>("SELECT * FROM channels WHERE id = ?")
+        .bind(id)
+        .fetch_optional(db)
+        .await?;
+    Ok(channel)
+}
+
+pub async fn delete_channel(db: &SqlitePool, id: i64) -> anyhow::Result<bool> {
+    let result = sqlx::query("DELETE FROM channels WHERE id = ?")
+        .bind(id)
+        .execute(db)
+        .await?;
+    Ok(result.rows_affected() > 0)
+}
+
+/// Channels an alert for this check should go to.
+pub async fn channels_for_check(db: &SqlitePool, check_id: i64) -> anyhow::Result<Vec<Channel>> {
+    let channels = sqlx::query_as::<_, Channel>(
+        "SELECT c.* FROM channels c \
+         JOIN check_channels cc ON cc.channel_id = c.id \
+         WHERE cc.check_id = ? AND c.enabled = 1 \
+         ORDER BY c.id",
+    )
+    .bind(check_id)
+    .fetch_all(db)
+    .await?;
+    Ok(channels)
+}
+
+pub async fn attach_channel(db: &SqlitePool, check_id: i64, channel_id: i64) -> anyhow::Result<()> {
+    sqlx::query(
+        "INSERT INTO check_channels (check_id, channel_id) VALUES (?, ?) \
+         ON CONFLICT DO NOTHING",
+    )
+    .bind(check_id)
+    .bind(channel_id)
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+pub async fn detach_channel(
+    db: &SqlitePool,
+    check_id: i64,
+    channel_id: i64,
+) -> anyhow::Result<bool> {
+    let result = sqlx::query("DELETE FROM check_channels WHERE check_id = ? AND channel_id = ?")
+        .bind(check_id)
+        .bind(channel_id)
+        .execute(db)
+        .await?;
+    Ok(result.rows_affected() > 0)
+}
+
+pub async fn record_notification(
+    db: &SqlitePool,
+    check_id: i64,
+    channel_id: i64,
+    reason: &str,
+    error: Option<&str>,
+) -> anyhow::Result<()> {
+    sqlx::query(
+        "INSERT INTO notifications (check_id, channel_id, ts, reason, status, error) \
+         VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .bind(check_id)
+    .bind(channel_id)
+    .bind(now())
+    .bind(reason)
+    .bind(if error.is_some() { "failed" } else { "sent" })
+    .bind(error)
+    .execute(db)
+    .await?;
+    Ok(())
 }
 
 /// What the client told us about this ping, beyond its kind.

@@ -50,6 +50,30 @@ pub enum CheckKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type)]
 #[sqlx(rename_all = "lowercase")]
+pub enum ChannelKind {
+    /// Arbitrary HTTP request, with the payload under the user's control.
+    Webhook,
+    /// ntfy.sh (or a self-hosted instance): push notification to a topic.
+    Ntfy,
+}
+
+impl ChannelKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ChannelKind::Webhook => "webhook",
+            ChannelKind::Ntfy => "ntfy",
+        }
+    }
+}
+
+impl fmt::Display for ChannelKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.pad(self.as_str())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type)]
+#[sqlx(rename_all = "lowercase")]
 pub enum PingKind {
     Success,
     /// Job started; the matching success/fail ping measures the duration.
@@ -96,6 +120,26 @@ pub struct Check {
     pub n_pings: i64,
     pub created_at: i64,
     pub updated_at: i64,
+}
+
+impl Check {
+    /// One-line description of what this check expects, shared by the CLI, the
+    /// UI and notification messages.
+    pub fn schedule_summary(&self) -> String {
+        match self.kind {
+            CheckKind::Simple => format!(
+                "every {} (grace {})",
+                format_duration(self.period_s),
+                format_duration(self.grace_s)
+            ),
+            CheckKind::Cron => format!(
+                "{} [{}] (grace {})",
+                self.cron_expr.as_deref().unwrap_or("?"),
+                self.tz,
+                format_duration(self.grace_s)
+            ),
+        }
+    }
 }
 
 /// Parse a human duration into seconds: `30s`, `5m`, `2h`, `1d`, or a

@@ -8,7 +8,8 @@ use axum::{Router, body::Bytes};
 use uuid::Uuid;
 
 use crate::error::AppError;
-use crate::model::PingKind;
+use crate::model::{PingKind, Status};
+use crate::notify;
 use crate::state::AppState;
 use crate::store::{self, PingInput};
 
@@ -90,6 +91,19 @@ async fn handle(
                 to = %outcome.status,
                 "ping recorded"
             );
+
+            // Transitions caused by the ping itself: the alert loop only ever
+            // sees a check go down by silence, never by an explicit /fail.
+            match (outcome.previous, outcome.status) {
+                (before, Status::Down) if before != Status::Down => {
+                    notify::spawn_by_uuid(state, uuid, notify::Event::Down);
+                }
+                (Status::Down, Status::Up) => {
+                    notify::spawn_by_uuid(state, uuid, notify::Event::Up);
+                }
+                _ => {}
+            }
+
             Ok((StatusCode::OK, "OK\n").into_response())
         }
         None => Ok(not_found()),

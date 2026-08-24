@@ -8,4 +8,7 @@ use crate::config::Config;
 pub struct AppState {
     pub db: SqlitePool,
     pub config: Arc<Config>,
+    /// Shared so notification deliveries reuse connections instead of opening
+    /// a TLS session per alert.
+    pub http: reqwest::Client,
 }

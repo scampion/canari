@@ -4,6 +4,7 @@ mod db;
 mod engine;
 mod error;
 mod model;
+mod notify;
 mod schedule;
 mod state;
 mod store;
@@ -11,10 +12,10 @@ mod web;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
-use sqlx::SqlitePool;
 use tracing_subscriber::EnvFilter;
 
 use crate::cli::Command;
@@ -27,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
 
     // One-shot commands print their own output; the server logs.
     let default_filter = match config.command {
-        Some(Command::Check(_)) => "warn",
+        Some(Command::Check(_)) | Some(Command::Channel(_)) => "warn",
         _ => "canari=info,tower_http=warn",
     };
     tracing_subscriber::fmt()
@@ -38,11 +39,24 @@ async fn main() -> anyhow::Result<()> {
 
     let pool = db::connect(&config.db).await?;
 
-    let result = match &config.command {
-        Some(Command::Check(cmd)) => cli::run(&pool, &config, cmd).await,
+    let http = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .user_agent(concat!("canari/", env!("CARGO_PKG_VERSION")))
+        .build()
+        .context("building HTTP client")?;
+
+    let state = AppState {
+        db: pool.clone(),
+        config: Arc::new(config),
+        http,
+    };
+
+    let result = match &state.config.command {
+        Some(Command::Check(cmd)) => cli::run_check(&state, cmd).await,
+        Some(Command::Channel(cmd)) => cli::run_channel(&state, cmd).await,
         _ => {
-            tracing::info!(db = %config.db.display(), "database ready");
-            serve(config, pool.clone()).await
+            tracing::info!(db = %state.config.db.display(), "database ready");
+            serve(state.clone()).await
         }
     };
 
@@ -51,16 +65,12 @@ async fn main() -> anyhow::Result<()> {
     result
 }
 
-async fn serve(config: Config, pool: SqlitePool) -> anyhow::Result<()> {
-    let listener = tokio::net::TcpListener::bind(config.listen)
+async fn serve(state: AppState) -> anyhow::Result<()> {
+    let listen = state.config.listen;
+    let listener = tokio::net::TcpListener::bind(listen)
         .await
-        .with_context(|| format!("binding {}", config.listen))?;
-    tracing::info!(listen = %config.listen, ping_base = %config.ping_base(), "canari listening");
-
-    let state = AppState {
-        db: pool,
-        config: Arc::new(config),
-    };
+        .with_context(|| format!("binding {listen}"))?;
+    tracing::info!(%listen, ping_base = %state.config.ping_base(), "canari listening");
 
     let alert_loop = tokio::spawn(engine::run(state.clone()));
 
