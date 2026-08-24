@@ -33,13 +33,66 @@ pub enum AdminCmd {
         #[arg(long)]
         password: Option<String>,
     },
+
+    /// Create an API key; the secret is shown once and never stored in clear
+    KeyNew {
+        name: String,
+
+        /// Allow GET requests only
+        #[arg(long)]
+        read_only: bool,
+    },
+
+    /// List API keys
+    KeyLs,
+
+    /// Revoke an API key
+    KeyRm { id: i64 },
 }
 
 pub async fn run_admin(state: &AppState, cmd: &AdminCmd) -> anyhow::Result<()> {
+    let db = &state.db;
+
     match cmd {
         AdminCmd::SetPassword { password } => {
-            crate::auth::set_password_interactive(&state.db, password.as_deref()).await?;
+            crate::auth::set_password_interactive(db, password.as_deref()).await?;
             println!("password updated — existing sessions were signed out");
+        }
+
+        AdminCmd::KeyNew { name, read_only } => {
+            let (key, secret) = store::create_api_key(db, name, *read_only).await?;
+            println!("key #{} {}", key.id, key.name);
+            println!("  access  {}", if *read_only { "read-only" } else { "read-write" });
+            println!("  secret  {secret}");
+            println!("\nStore it now — canari keeps only its hash.");
+            println!("Use it as:  curl -H \"X-Api-Key: {secret}\" {}/api/v1/checks", state.config.site_url.trim_end_matches('/'));
+        }
+
+        AdminCmd::KeyLs => {
+            let keys = store::list_api_keys(db).await?;
+            if keys.is_empty() {
+                println!("no API keys yet");
+                return Ok(());
+            }
+            println!("{:<5} {:<24} {:<12} {:<12} {}", "ID", "NAME", "ACCESS", "CREATED", "LAST USED");
+            for key in keys {
+                println!(
+                    "{:<5} {:<24} {:<12} {:<12} {}",
+                    key.id,
+                    truncate(&key.name, 24),
+                    if key.read_only { "read-only" } else { "read-write" },
+                    &format_ts(key.created_at)[..10],
+                    key.last_used_at.map(format_ts).unwrap_or_else(|| "never".into()),
+                );
+            }
+        }
+
+        AdminCmd::KeyRm { id } => {
+            if store::delete_api_key(db, *id).await? {
+                println!("revoked key #{id}");
+            } else {
+                anyhow::bail!("no API key with id {id}");
+            }
         }
     }
     Ok(())

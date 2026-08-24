@@ -38,6 +38,13 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
+    // rustls needs a crypto provider chosen explicitly. ring is picked over
+    // aws-lc-rs because it builds for musl without cmake or a C toolchain,
+    // which is what keeps "one static binary" a one-command build.
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .map_err(|_| anyhow::anyhow!("installing the rustls crypto provider"))?;
+
     let pool = db::connect(&config.db).await?;
 
     let http = reqwest::Client::builder()

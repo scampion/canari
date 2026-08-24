@@ -1,5 +1,6 @@
+mod api;
 mod ping;
-mod ui;
+pub mod ui;
 
 use axum::extract::State;
 use axum::http::header;
@@ -19,7 +20,11 @@ pub fn router(state: AppState) -> Router {
         .route("/static/style.css", get(style))
         .route("/static/logo.png", get(logo))
         .route("/static/favicon.png", get(favicon))
+        // Badges are public: they are addressed by an opaque token, never by
+        // the uuid that authorises pings.
+        .route("/badge/{token}", get(api::badge))
         .merge(ping::routes())
+        .merge(api::routes(state.clone()))
         .merge(ui::routes(state.clone()))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())

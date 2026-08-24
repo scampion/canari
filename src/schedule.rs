@@ -83,6 +83,7 @@ mod tests {
             n_pings: 0,
             created_at: 0,
             updated_at: 0,
+            badge_token: "badge".into(),
         }
     }
 

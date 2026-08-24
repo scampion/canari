@@ -5,6 +5,16 @@ use serde_json::json;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
+    /// Caller's fault, and safe to explain: validation and parsing failures.
+    #[error("{0}")]
+    BadRequest(String),
+
+    #[error("not found")]
+    NotFound,
+
+    #[error("unauthorized")]
+    Unauthorized,
+
     #[error(transparent)]
     Db(#[from] sqlx::Error),
 
@@ -14,10 +24,21 @@ pub enum AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        // Internal failures are logged in full and reported to the caller as a
-        // bare 500: error text can carry database contents.
-        tracing::error!(error = ?self, "request failed");
-        let body = Json(json!({ "error": "internal server error" }));
-        (StatusCode::INTERNAL_SERVER_ERROR, body).into_response()
+        let (status, message) = match &self {
+            AppError::BadRequest(message) => (StatusCode::BAD_REQUEST, message.clone()),
+            AppError::NotFound => (StatusCode::NOT_FOUND, "not found".into()),
+            AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized".into()),
+            // Internal failures are logged in full and reported to the caller
+            // as a bare 500: error text can carry database contents.
+            _ => {
+                tracing::error!(error = ?self, "request failed");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "internal server error".into(),
+                )
+            }
+        };
+
+        (status, Json(json!({ "error": message }))).into_response()
     }
 }

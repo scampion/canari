@@ -178,6 +178,7 @@ pub async fn send_test(state: &AppState, channel: &Channel) -> Result<(), SendEr
         n_pings: 0,
         created_at: now(),
         updated_at: now(),
+        badge_token: "sample".into(),
     };
     send_once(state, channel, &sample, Event::Down).await
 }
@@ -447,6 +448,7 @@ mod tests {
             n_pings: 7,
             created_at: 0,
             updated_at: 0,
+            badge_token: "badge".into(),
         }
     }
 

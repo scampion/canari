@@ -92,12 +92,11 @@ pub async fn verify_password(db: &SqlitePool, plain: &str) -> anyhow::Result<boo
 /// Create a session and return the raw token to put in the cookie. Only its
 /// hash is persisted.
 pub async fn create_session(db: &SqlitePool) -> anyhow::Result<String> {
-    let bytes: [u8; 32] = rand::random();
-    let token = B64.encode(bytes);
+    let token = generate_secret();
     let ts = now();
 
     sqlx::query("INSERT INTO sessions (token_hash, created_at, expires_at) VALUES (?, ?, ?)")
-        .bind(hash_token(&token))
+        .bind(hash_secret(&token))
         .bind(ts)
         .bind(ts + SESSION_TTL)
         .execute(db)
@@ -116,7 +115,7 @@ pub async fn session_is_valid(db: &SqlitePool, token: &str) -> anyhow::Result<bo
     let count = sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*) FROM sessions WHERE token_hash = ? AND expires_at > ?",
     )
-    .bind(hash_token(token))
+    .bind(hash_secret(token))
     .bind(now())
     .fetch_one(db)
     .await?;
@@ -125,14 +124,22 @@ pub async fn session_is_valid(db: &SqlitePool, token: &str) -> anyhow::Result<bo
 
 pub async fn destroy_session(db: &SqlitePool, token: &str) -> anyhow::Result<()> {
     sqlx::query("DELETE FROM sessions WHERE token_hash = ?")
-        .bind(hash_token(token))
+        .bind(hash_secret(token))
         .execute(db)
         .await?;
     Ok(())
 }
 
-fn hash_token(token: &str) -> String {
-    B64.encode(Sha256::digest(token.as_bytes()))
+/// Shared by session tokens and API keys: both are high-entropy secrets, so a
+/// plain SHA-256 is enough — there is nothing to brute-force.
+pub fn hash_secret(secret: &str) -> String {
+    B64.encode(Sha256::digest(secret.as_bytes()))
+}
+
+/// Generate a URL-safe secret with 256 bits of entropy.
+pub fn generate_secret() -> String {
+    let bytes: [u8; 32] = rand::random();
+    B64.encode(bytes)
 }
 
 /// Read our session cookie out of the request headers.

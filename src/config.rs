@@ -29,4 +29,12 @@ impl Config {
     pub fn ping_base(&self) -> String {
         format!("{}/ping", self.site_url.trim_end_matches('/'))
     }
+
+    /// Public badge URL for a check's badge token.
+    pub fn badge_url(&self, badge_token: &str) -> String {
+        format!(
+            "{}/badge/{badge_token}.svg",
+            self.site_url.trim_end_matches('/')
+        )
+    }
 }

@@ -24,10 +24,14 @@
   <div class="panel">
     <h2 style="margin-top:0">Ping URL</h2>
     <code class="ping-url">{{ ping_url }}</code>
-    <p class="muted" style="margin-bottom:0">
+    <p class="muted">
       Add <code>/start</code>, <code>/fail</code>, <code>/log</code> or an exit code to the URL.
       Any HTTP method works.
     </p>
+    <h2>Status badge</h2>
+    <p><img src="/badge/{{ badge_token }}.svg" alt="{{ name }} status"></p>
+    <code class="ping-url">{{ badge_url }}</code>
+    <p class="muted" style="margin-bottom:0">Public — it carries no ping credential.</p>
   </div>
 
   <div class="panel">

@@ -38,8 +38,8 @@ pub async fn create_check(db: &SqlitePool, new: NewCheck) -> anyhow::Result<Chec
     // added by later migrations are simply ignored.
     let check = sqlx::query_as::<_, Check>(
         "INSERT INTO checks (uuid, name, description, tags, kind, period_s, grace_s, \
-                             cron_expr, tz, status, created_at, updated_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?) \
+                             cron_expr, tz, status, created_at, updated_at, badge_token) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, lower(hex(randomblob(12)))) \
          RETURNING *",
     )
     .bind(&uuid)
@@ -325,6 +325,71 @@ pub async fn record_notification(
     .execute(db)
     .await?;
     Ok(())
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct ApiKey {
+    pub id: i64,
+    pub name: String,
+    pub read_only: bool,
+    pub created_at: i64,
+    pub last_used_at: Option<i64>,
+}
+
+/// Mint an API key. The secret is returned once and never stored in the clear.
+pub async fn create_api_key(
+    db: &SqlitePool,
+    name: &str,
+    read_only: bool,
+) -> anyhow::Result<(ApiKey, String)> {
+    let secret = format!("ck_{}", crate::auth::generate_secret());
+
+    let key = sqlx::query_as::<_, ApiKey>(
+        "INSERT INTO api_keys (name, hash, read_only, created_at) VALUES (?, ?, ?, ?) \
+         RETURNING id, name, read_only, created_at, last_used_at",
+    )
+    .bind(name)
+    .bind(crate::auth::hash_secret(&secret))
+    .bind(read_only)
+    .bind(now())
+    .fetch_one(db)
+    .await?;
+
+    Ok((key, secret))
+}
+
+pub async fn list_api_keys(db: &SqlitePool) -> anyhow::Result<Vec<ApiKey>> {
+    let keys = sqlx::query_as::<_, ApiKey>(
+        "SELECT id, name, read_only, created_at, last_used_at FROM api_keys ORDER BY id",
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(keys)
+}
+
+pub async fn delete_api_key(db: &SqlitePool, id: i64) -> anyhow::Result<bool> {
+    let result = sqlx::query("DELETE FROM api_keys WHERE id = ?")
+        .bind(id)
+        .execute(db)
+        .await?;
+    Ok(result.rows_affected() > 0)
+}
+
+/// Look up a presented key by hash, recording the use.
+pub async fn authenticate_api_key(
+    db: &SqlitePool,
+    presented: &str,
+) -> anyhow::Result<Option<ApiKey>> {
+    let hash = crate::auth::hash_secret(presented);
+    let key = sqlx::query_as::<_, ApiKey>(
+        "UPDATE api_keys SET last_used_at = ? WHERE hash = ? \
+         RETURNING id, name, read_only, created_at, last_used_at",
+    )
+    .bind(now())
+    .bind(hash)
+    .fetch_optional(db)
+    .await?;
+    Ok(key)
 }
 
 /// What the client told us about this ping, beyond its kind.

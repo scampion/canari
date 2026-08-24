@@ -82,6 +82,8 @@ struct CheckTemplate {
     description: String,
     tags: Vec<String>,
     ping_url: String,
+    badge_url: String,
+    badge_token: String,
     pings: Vec<PingRow>,
 }
 
@@ -250,6 +252,8 @@ async fn check_detail(
         description: check.description.clone(),
         tags: tag_list(&check.tags),
         ping_url: format!("{}/{}", state.config.ping_base(), check.uuid),
+        badge_url: state.config.badge_url(&check.badge_token),
+        badge_token: check.badge_token.clone(),
         pings,
         uuid: check.uuid,
         name: check.name,

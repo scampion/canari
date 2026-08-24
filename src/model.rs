@@ -120,6 +120,9 @@ pub struct Check {
     pub n_pings: i64,
     pub created_at: i64,
     pub updated_at: i64,
+    /// Public identifier used by status badges, so badge URLs never expose the
+    /// uuid that authorises pings.
+    pub badge_token: String,
 }
 
 impl Check {
@@ -192,6 +195,14 @@ pub fn parse_duration(input: &str) -> anyhow::Result<i64> {
 pub fn format_ts(ts: i64) -> String {
     match chrono::DateTime::from_timestamp(ts, 0) {
         Some(dt) => dt.format("%Y-%m-%d %H:%M:%SZ").to_string(),
+        None => ts.to_string(),
+    }
+}
+
+/// Machine-readable timestamp for API responses.
+pub fn format_rfc3339(ts: i64) -> String {
+    match chrono::DateTime::from_timestamp(ts, 0) {
+        Some(dt) => dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
         None => ts.to_string(),
     }
 }
