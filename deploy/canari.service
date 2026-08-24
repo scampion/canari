@@ -1,0 +1,41 @@
+[Unit]
+Description=canari — dead man's switch monitoring
+Documentation=https://github.com/scampion/canari
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=canari
+Group=canari
+ExecStart=/usr/local/bin/canari
+
+# StateDirectory creates and owns /var/lib/canari on first start.
+StateDirectory=canari
+WorkingDirectory=/var/lib/canari
+Environment=CANARI_DB=/var/lib/canari/canari.db
+Environment=CANARI_LISTEN=127.0.0.1:8000
+Environment=CANARI_SITE_URL=https://canari.example.org
+
+Restart=on-failure
+RestartSec=2
+
+# The process needs a database file, outbound HTTP and a listening socket —
+# nothing else.
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallFilter=@system-service
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
