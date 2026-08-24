@@ -122,6 +122,9 @@ pub struct PingInput {
 #[derive(Debug, Clone, Copy)]
 pub struct PingOutcome {
     pub status: Status,
+    /// Status before this ping, so the caller can spot a recovery or a fresh
+    /// failure and notify exactly once.
+    pub previous: Status,
     pub n: i64,
 }
 
@@ -168,7 +171,7 @@ pub async fn record_ping(
                 // A ping on a paused check resumes it: whoever is still running
                 // the job clearly expects it to be monitored.
                 status = Status::Up;
-                alert_after = Some(schedule::next_deadline(&check, ts)?);
+                alert_after = Some(schedule::next_due(&check, ts)?);
             } else {
                 // Already down; nothing left to be late for.
                 status = Status::Down;
@@ -241,5 +244,9 @@ pub async fn record_ping(
     .await?;
 
     tx.commit().await?;
-    Ok(Some(PingOutcome { status, n }))
+    Ok(Some(PingOutcome {
+        status,
+        previous: check.status,
+        n,
+    }))
 }

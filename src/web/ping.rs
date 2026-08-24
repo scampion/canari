@@ -82,7 +82,14 @@ async fn handle(
 
     match store::record_ping(&state.db, &uuid, input).await? {
         Some(outcome) => {
-            tracing::debug!(uuid, %kind, n = outcome.n, status = %outcome.status, "ping recorded");
+            tracing::debug!(
+                uuid,
+                %kind,
+                n = outcome.n,
+                from = %outcome.previous,
+                to = %outcome.status,
+                "ping recorded"
+            );
             Ok((StatusCode::OK, "OK\n").into_response())
         }
         None => Ok(not_found()),

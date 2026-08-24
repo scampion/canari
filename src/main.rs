@@ -1,6 +1,7 @@
 mod cli;
 mod config;
 mod db;
+mod engine;
 mod error;
 mod model;
 mod schedule;
@@ -61,16 +62,22 @@ async fn serve(config: Config, pool: SqlitePool) -> anyhow::Result<()> {
         config: Arc::new(config),
     };
 
+    let alert_loop = tokio::spawn(engine::run(state.clone()));
+
     // ConnectInfo gives ping handlers the peer address to record.
     let app = web::router(state).into_make_service_with_connect_info::<SocketAddr>();
 
-    axum::serve(listener, app)
+    let result = axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
-        .context("server error")?;
+        .context("server error");
+
+    // Nothing to drain: each tick commits its own transaction, and an aborted
+    // one rolls back.
+    alert_loop.abort();
 
     tracing::info!("shutdown complete");
-    Ok(())
+    result
 }
 
 async fn shutdown_signal() {

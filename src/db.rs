@@ -36,3 +36,15 @@ pub async fn connect(path: &Path) -> anyhow::Result<SqlitePool> {
 
     Ok(pool)
 }
+
+/// Throwaway migrated database for tests. A single connection keeps every
+/// query on the same in-memory database.
+#[cfg(test)]
+pub async fn connect_memory() -> anyhow::Result<SqlitePool> {
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect("sqlite::memory:")
+        .await?;
+    sqlx::migrate!("./migrations").run(&pool).await?;
+    Ok(pool)
+}
