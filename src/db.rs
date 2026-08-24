@@ -3,9 +3,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 use sqlx::SqlitePool;
-use sqlx::sqlite::{
-    SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous,
-};
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 
 /// Open the database, applying the pragmas this service depends on, and run
 /// any pending migrations.

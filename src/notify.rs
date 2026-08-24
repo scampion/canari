@@ -6,7 +6,7 @@ use base64::Engine as _;
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::model::{Check, ChannelKind, CheckKind, Status, format_duration, format_ts, now};
+use crate::model::{ChannelKind, Check, CheckKind, Status, format_duration, format_ts, now};
 use crate::state::AppState;
 use crate::store::{self, Channel};
 
@@ -485,7 +485,10 @@ mod tests {
     #[test]
     fn encodes_non_ascii_headers() {
         assert_eq!(encode_header("backup"), "backup");
-        assert_eq!(encode_header("sauvegarde réussie"), "=?UTF-8?B?c2F1dmVnYXJkZSByw6l1c3NpZQ==?=");
+        assert_eq!(
+            encode_header("sauvegarde réussie"),
+            "=?UTF-8?B?c2F1dmVnYXJkZSByw6l1c3NpZQ==?="
+        );
     }
 
     #[test]
@@ -494,11 +497,20 @@ mod tests {
         assert!(validate_config(ChannelKind::Webhook, r#"{"url":"ftp://x.test"}"#).is_err());
         assert!(validate_config(ChannelKind::Webhook, r#"{}"#).is_err());
         assert!(
-            validate_config(ChannelKind::Webhook, r#"{"url":"https://x.test","method":"WAT WAT"}"#)
-                .is_err()
+            validate_config(
+                ChannelKind::Webhook,
+                r#"{"url":"https://x.test","method":"WAT WAT"}"#
+            )
+            .is_err()
         );
         assert!(validate_config(ChannelKind::Ntfy, r#"{"topic":"alerts"}"#).is_ok());
         assert!(validate_config(ChannelKind::Ntfy, r#"{"topic":""}"#).is_err());
-        assert!(validate_config(ChannelKind::Ntfy, r#"{"server":"https://n.test","topic":"a","priority":5}"#).is_ok());
+        assert!(
+            validate_config(
+                ChannelKind::Ntfy,
+                r#"{"server":"https://n.test","topic":"a","priority":5}"#
+            )
+            .is_ok()
+        );
     }
 }

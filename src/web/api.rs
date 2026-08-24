@@ -33,11 +33,7 @@ pub fn routes(state: AppState) -> Router<AppState> {
 ///
 /// Read-only keys exist so a status page or a dashboard can poll the API
 /// without holding a credential that could delete checks.
-async fn require_api_key(
-    State(state): State<AppState>,
-    request: Request,
-    next: Next,
-) -> Response {
+async fn require_api_key(State(state): State<AppState>, request: Request, next: Next) -> Response {
     let presented = request
         .headers()
         .get(API_KEY_HEADER)
@@ -115,7 +111,7 @@ struct CheckPayload {
 }
 
 impl CheckPayload {
-    fn into_new_check(&self) -> Result<NewCheck, AppError> {
+    fn to_new_check(&self) -> Result<NewCheck, AppError> {
         let kind = match self.kind.as_deref() {
             Some("cron") => CheckKind::Cron,
             Some("simple") | None => CheckKind::Simple,
@@ -152,7 +148,7 @@ async fn create_check(
     State(state): State<AppState>,
     Json(payload): Json<CheckPayload>,
 ) -> Result<Response, AppError> {
-    let new = payload.into_new_check()?;
+    let new = payload.to_new_check()?;
     let check = store::create_check(&state.db, new)
         .await
         .map_err(|err| AppError::BadRequest(err.to_string()))?;
@@ -173,7 +169,7 @@ async fn update_check(
         .await?
         .ok_or(AppError::NotFound)?;
 
-    let new = payload.into_new_check()?;
+    let new = payload.to_new_check()?;
     let check = store::update_check(&state.db, &uuid, new)
         .await
         .map_err(|err| AppError::BadRequest(err.to_string()))?;

@@ -2,7 +2,7 @@ use anyhow::Context;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-use crate::model::{Check, CheckKind, ChannelKind, PingKind, Status, now};
+use crate::model::{ChannelKind, Check, CheckKind, PingKind, Status, now};
 use crate::schedule;
 
 /// Pings kept per check. Old ones are dropped as new ones arrive, so the
@@ -130,7 +130,7 @@ pub async fn set_check_channels(
 pub async fn list_checks(db: &SqlitePool) -> anyhow::Result<Vec<Check>> {
     let checks = sqlx::query_as::<_, Check>("SELECT * FROM checks ORDER BY name, id")
         .fetch_all(db)
-    .await?;
+        .await?;
     Ok(checks)
 }
 

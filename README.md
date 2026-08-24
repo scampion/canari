@@ -16,11 +16,26 @@ canari 0.1.0 · ~9 Mo · SQLite embarqué · webhook + ntfy · API REST · badge
 
 ## Démarrage
 
+Chaque tag `vX.Y` publie des binaires dans les
+[releases](../../releases) : Linux musl statique (x86_64 et aarch64) et macOS
+(Apple Silicon et Intel).
+
+```sh
+tar xzf canari-v0.1-x86_64-unknown-linux-musl.tar.gz
+cd canari-v0.1-x86_64-unknown-linux-musl
+```
+
+Ou depuis les sources :
+
 ```sh
 cargo build --release
+```
 
-./target/release/canari admin set-password        # demande le mot de passe
-./target/release/canari --site-url https://canari.example.org
+Puis, dans les deux cas :
+
+```sh
+./canari admin set-password        # demande le mot de passe
+./canari --site-url https://canari.example.org
 ```
 
 Puis <http://127.0.0.1:8000>. Tant qu'aucun mot de passe n'est défini, l'UI
@@ -156,6 +171,21 @@ docker run -d -p 8000:8000 -v canari-data:/data \
   -e CANARI_SITE_URL=https://canari.example.org canari
 docker exec -it <id> canari admin set-password
 ```
+
+### Compilation croisée
+
+Les workflows GitHub s'en chargent à chaque tag `vX.Y`. En local, zig sert à la
+fois de compilateur C (pour le SQLite embarqué) et de linker :
+
+```sh
+brew install rustup zig                 # ou l'équivalent de la distribution
+rustup target add x86_64-unknown-linux-musl
+cargo install cargo-zigbuild
+cargo zigbuild --release --target x86_64-unknown-linux-musl
+```
+
+Le binaire obtenu est statique : `ELF 64-bit LSB executable, x86-64, statically
+linked, stripped`, ~10 Mo.
 
 ### Sauvegarde
 

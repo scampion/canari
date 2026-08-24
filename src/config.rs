@@ -6,7 +6,11 @@ use clap::Parser;
 use crate::cli::Command;
 
 #[derive(Parser, Debug)]
-#[command(name = "canari", version, about = "Dead man's switch monitoring for cron jobs")]
+#[command(
+    name = "canari",
+    version,
+    about = "Dead man's switch monitoring for cron jobs"
+)]
 pub struct Config {
     /// SQLite database file (created on first run)
     #[arg(long, env = "CANARI_DB", default_value = "canari.db")]

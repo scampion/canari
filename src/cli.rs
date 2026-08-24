@@ -62,10 +62,20 @@ pub async fn run_admin(state: &AppState, cmd: &AdminCmd) -> anyhow::Result<()> {
         AdminCmd::KeyNew { name, read_only } => {
             let (key, secret) = store::create_api_key(db, name, *read_only).await?;
             println!("key #{} {}", key.id, key.name);
-            println!("  access  {}", if *read_only { "read-only" } else { "read-write" });
+            println!(
+                "  access  {}",
+                if *read_only {
+                    "read-only"
+                } else {
+                    "read-write"
+                }
+            );
             println!("  secret  {secret}");
             println!("\nStore it now — canari keeps only its hash.");
-            println!("Use it as:  curl -H \"X-Api-Key: {secret}\" {}/api/v1/checks", state.config.site_url.trim_end_matches('/'));
+            println!(
+                "Use it as:  curl -H \"X-Api-Key: {secret}\" {}/api/v1/checks",
+                state.config.site_url.trim_end_matches('/')
+            );
         }
 
         AdminCmd::KeyLs => {
@@ -74,15 +84,24 @@ pub async fn run_admin(state: &AppState, cmd: &AdminCmd) -> anyhow::Result<()> {
                 println!("no API keys yet");
                 return Ok(());
             }
-            println!("{:<5} {:<24} {:<12} {:<12} {}", "ID", "NAME", "ACCESS", "CREATED", "LAST USED");
+            println!(
+                "{:<5} {:<24} {:<12} {:<12} LAST USED",
+                "ID", "NAME", "ACCESS", "CREATED"
+            );
             for key in keys {
                 println!(
                     "{:<5} {:<24} {:<12} {:<12} {}",
                     key.id,
                     truncate(&key.name, 24),
-                    if key.read_only { "read-only" } else { "read-write" },
+                    if key.read_only {
+                        "read-only"
+                    } else {
+                        "read-write"
+                    },
                     &format_ts(key.created_at)[..10],
-                    key.last_used_at.map(format_ts).unwrap_or_else(|| "never".into()),
+                    key.last_used_at
+                        .map(format_ts)
+                        .unwrap_or_else(|| "never".into()),
                 );
             }
         }
@@ -267,8 +286,8 @@ pub async fn run_check(state: &AppState, cmd: &CheckCmd) -> anyhow::Result<()> {
 
             let ts = now();
             println!(
-                "{:<7} {:<24} {:<12} {:<12} {}",
-                "STATUS", "NAME", "LAST PING", "LATE IN", "UUID"
+                "{:<7} {:<24} {:<12} {:<12} UUID",
+                "STATUS", "NAME", "LAST PING", "LATE IN"
             );
             for check in checks {
                 let last = match check.last_ping_at {
@@ -341,8 +360,8 @@ pub async fn run_check(state: &AppState, cmd: &CheckCmd) -> anyhow::Result<()> {
                 return Ok(());
             }
             println!(
-                "\n{:<5} {:<21} {:<8} {:<5} {:<9} {:<6} {:<16} {}",
-                "#", "WHEN", "KIND", "EXIT", "DURATION", "VIA", "FROM", "AGENT"
+                "\n{:<5} {:<21} {:<8} {:<5} {:<9} {:<6} {:<16} AGENT",
+                "#", "WHEN", "KIND", "EXIT", "DURATION", "VIA", "FROM"
             );
             for ping in pings {
                 println!(
@@ -446,7 +465,10 @@ pub async fn run_channel(state: &AppState, cmd: &ChannelCmd) -> anyhow::Result<(
             });
             let channel =
                 store::create_channel(db, ChannelKind::Webhook, name, &config.to_string()).await?;
-            println!("channel #{} {} ({})", channel.id, channel.name, channel.kind);
+            println!(
+                "channel #{} {} ({})",
+                channel.id, channel.name, channel.kind
+            );
         }
 
         ChannelCmd::AddNtfy {
@@ -464,7 +486,10 @@ pub async fn run_channel(state: &AppState, cmd: &ChannelCmd) -> anyhow::Result<(
             });
             let channel =
                 store::create_channel(db, ChannelKind::Ntfy, name, &config.to_string()).await?;
-            println!("channel #{} {} ({})", channel.id, channel.name, channel.kind);
+            println!(
+                "channel #{} {} ({})",
+                channel.id, channel.name, channel.kind
+            );
             println!("  target  {}/{}", server.trim_end_matches('/'), topic);
         }
 
@@ -475,8 +500,8 @@ pub async fn run_channel(state: &AppState, cmd: &ChannelCmd) -> anyhow::Result<(
                 return Ok(());
             }
             println!(
-                "{:<5} {:<9} {:<20} {:<9} {:<12} {}",
-                "ID", "KIND", "NAME", "STATE", "ADDED", "TARGET"
+                "{:<5} {:<9} {:<20} {:<9} {:<12} TARGET",
+                "ID", "KIND", "NAME", "STATE", "ADDED"
             );
             for channel in channels {
                 println!(
@@ -484,7 +509,11 @@ pub async fn run_channel(state: &AppState, cmd: &ChannelCmd) -> anyhow::Result<(
                     channel.id,
                     channel.kind,
                     truncate(&channel.name, 20),
-                    if channel.enabled { "enabled" } else { "disabled" },
+                    if channel.enabled {
+                        "enabled"
+                    } else {
+                        "disabled"
+                    },
                     &format_ts(channel.created_at)[..10],
                     truncate(&describe_target(&channel), 50)
                 );

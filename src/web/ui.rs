@@ -13,7 +13,9 @@ use serde_json::json;
 
 use crate::auth;
 use crate::error::AppError;
-use crate::model::{Check, ChannelKind, CheckKind, format_duration, format_ts, now, parse_duration};
+use crate::model::{
+    ChannelKind, Check, CheckKind, format_duration, format_ts, now, parse_duration,
+};
 use crate::notify;
 use crate::state::AppState;
 use crate::store::{self, Channel, NewCheck};
@@ -485,7 +487,10 @@ async fn test_channel(
             "/channels",
             &format!("Test alert sent through {}", channel.name),
         )),
-        Err(err) => Ok(redirect_err("/channels", &format!("Delivery failed: {err}"))),
+        Err(err) => Ok(redirect_err(
+            "/channels",
+            &format!("Delivery failed: {err}"),
+        )),
     }
 }
 
@@ -651,7 +656,11 @@ async fn form_with_error(
             format!("/checks/{}", check.uuid),
             format!("/checks/{}", check.uuid),
         ),
-        None => ("New check".to_string(), "/checks".to_string(), "/".to_string()),
+        None => (
+            "New check".to_string(),
+            "/checks".to_string(),
+            "/".to_string(),
+        ),
     };
 
     render(CheckFormTemplate {

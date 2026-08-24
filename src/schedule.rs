@@ -26,7 +26,8 @@ pub fn next_due(check: &Check, from_ts: i64) -> anyhow::Result<i64> {
 
 /// First occurrence of `expr` strictly after `from_ts`, as a unix timestamp.
 fn next_cron_occurrence(expr: &str, tz: &str, from_ts: i64) -> anyhow::Result<i64> {
-    let cron = Cron::from_str(expr).map_err(|e| anyhow!("invalid cron expression {expr:?}: {e}"))?;
+    let cron =
+        Cron::from_str(expr).map_err(|e| anyhow!("invalid cron expression {expr:?}: {e}"))?;
     let tz: Tz = tz.parse().map_err(|_| anyhow!("unknown timezone {tz:?}"))?;
     let from = DateTime::from_timestamp(from_ts, 0)
         .context("timestamp out of range")?
@@ -40,7 +41,12 @@ fn next_cron_occurrence(expr: &str, tz: &str, from_ts: i64) -> anyhow::Result<i6
 
 /// Reject a schedule before it reaches the database, so a broken expression
 /// surfaces at creation time rather than on the first ping.
-pub fn validate(kind: CheckKind, cron_expr: Option<&str>, tz: &str, period_s: i64) -> anyhow::Result<()> {
+pub fn validate(
+    kind: CheckKind,
+    cron_expr: Option<&str>,
+    tz: &str,
+    period_s: i64,
+) -> anyhow::Result<()> {
     match kind {
         CheckKind::Simple => {
             if period_s <= 0 {

@@ -1,6 +1,6 @@
 use anyhow::Context as _;
-use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use argon2::Argon2;
+use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use axum::extract::{Request, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::middleware::Next;
@@ -31,8 +31,7 @@ pub async fn set_password(db: &SqlitePool, plain: &str) -> anyhow::Result<()> {
     // argon2's optional rand feature for one call.
     let salt_bytes: [u8; 16] = rand::random();
     let hash = tokio::task::spawn_blocking(move || {
-        let salt =
-            SaltString::encode_b64(&salt_bytes).map_err(|e| anyhow::anyhow!("salt: {e}"))?;
+        let salt = SaltString::encode_b64(&salt_bytes).map_err(|e| anyhow::anyhow!("salt: {e}"))?;
         Argon2::default()
             .hash_password(plain.as_bytes(), &salt)
             .map(|h| h.to_string())
@@ -205,7 +204,10 @@ pub async fn require_auth(State(state): State<AppState>, request: Request, next:
 }
 
 /// Bootstrap the password from the CLI.
-pub async fn set_password_interactive(db: &SqlitePool, password: Option<&str>) -> anyhow::Result<()> {
+pub async fn set_password_interactive(
+    db: &SqlitePool,
+    password: Option<&str>,
+) -> anyhow::Result<()> {
     let password = match password {
         Some(p) => p.to_owned(),
         None => rpassword_prompt()?,

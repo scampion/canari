@@ -42,11 +42,7 @@ pub async fn run(state: AppState) {
                             tracing::warn!(uuid = %check.uuid, name = %check.name, "check is down");
                             // Spawned: a slow webhook must not delay the next
                             // tick or the checks queued behind this one.
-                            crate::notify::spawn(
-                                state.clone(),
-                                check,
-                                crate::notify::Event::Down,
-                            );
+                            crate::notify::spawn(state.clone(), check, crate::notify::Event::Down);
                         }
                     }
                 }
