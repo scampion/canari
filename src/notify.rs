@@ -277,7 +277,7 @@ async fn send_once(
         }
     };
 
-    let response = request.send().await.map_err(SendError::transient)?;
+    let response = request.send().await.map_err(SendError::from_reqwest)?;
     let status = response.status();
     if status.is_success() {
         return Ok(());
@@ -307,6 +307,23 @@ fn method_takes_body(method: &reqwest::Method) -> bool {
     )
 }
 
+/// Flatten an error and its causes into one line, skipping links that merely
+/// repeat what the previous one already said.
+fn error_chain(err: &dyn std::error::Error) -> String {
+    let mut parts = vec![err.to_string()];
+    let mut source = err.source();
+
+    while let Some(cause) = source {
+        let message = cause.to_string();
+        if !parts.iter().any(|part| part.contains(&message)) {
+            parts.push(message);
+        }
+        source = cause.source();
+    }
+
+    parts.join(": ")
+}
+
 /// HTTP headers are latin-1; ntfy reads titles as RFC 2047 when encoded, which
 /// keeps accented check names readable instead of mangled.
 fn encode_header(value: &str) -> String {
@@ -328,6 +345,18 @@ impl SendError {
         SendError {
             message: err.to_string(),
             retryable: true,
+        }
+    }
+
+    /// reqwest's own Display stops at "error sending request for url (…)" and
+    /// hides what actually went wrong — refused connection, unknown CA,
+    /// unresolvable name. The cause lives further down the source chain, so
+    /// unwind it before the message is shown or stored.
+    fn from_reqwest(err: reqwest::Error) -> Self {
+        let retryable = !err.is_builder();
+        SendError {
+            message: error_chain(&err),
+            retryable,
         }
     }
 
@@ -480,6 +509,49 @@ mod tests {
             serde_json::from_str(&vars.default_json()).expect("valid JSON");
         assert_eq!(parsed["check"], "weird \"name\" \n with newline");
         assert_eq!(parsed["status"], "up");
+    }
+
+    #[test]
+    fn error_chain_keeps_the_root_cause() {
+        #[derive(Debug)]
+        struct Wrapper(std::io::Error);
+
+        impl fmt::Display for Wrapper {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("error sending request for url (https://example.test/x)")
+            }
+        }
+
+        impl std::error::Error for Wrapper {
+            fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                Some(&self.0)
+            }
+        }
+
+        let wrapped = Wrapper(std::io::Error::new(
+            std::io::ErrorKind::ConnectionRefused,
+            "connection refused",
+        ));
+        let flattened = error_chain(&wrapped);
+
+        assert!(flattened.starts_with("error sending request for url"));
+        assert!(flattened.ends_with("connection refused"));
+    }
+
+    #[test]
+    fn error_chain_does_not_repeat_itself() {
+        #[derive(Debug)]
+        struct Echo(&'static str);
+
+        impl fmt::Display for Echo {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str(self.0)
+            }
+        }
+
+        impl std::error::Error for Echo {}
+
+        assert_eq!(error_chain(&Echo("boom")), "boom");
     }
 
     #[test]
